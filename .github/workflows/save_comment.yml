@@ -1,0 +1,27 @@
+name: Save Comment
+on:
+  repository_dispatch:
+    types: [new-comment]
+
+jobs:
+  update-json:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Add Comment to JSON
+        run: |
+          # Use 'jq' to add the new comment data to our array
+          echo '${{ github.event.client_payload.data }}' > new_comment.json
+          jq '. += [input]' comments.json new_comment.json > updated_comments.json
+          mv updated_comments.json comments.json
+          rm new_comment.json
+
+      - name: Commit and Push
+        run: |
+          git config user.name "CommentBot"
+          git config user.email "bot@neocities.org"
+          git add comments.json
+          git commit -m "New comment from site"
+          git push
