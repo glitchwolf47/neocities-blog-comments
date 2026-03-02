@@ -12,7 +12,12 @@ jobs:
 
       - name: Add Comment to JSON
         run: |
-          echo '${{ github.event.client_payload.data }}' > new_comment.json
+          # This writes the actual data as a JSON string to a temporary file
+          cat << 'EOF' > new_comment.json
+          ${{ toJson(github.event.client_payload.data) }}
+          EOF
+
+          # This uses jq to merge the new comment into your existing list
           jq '. += [input]' comments.json new_comment.json > updated_comments.json
           mv updated_comments.json comments.json
           rm new_comment.json
