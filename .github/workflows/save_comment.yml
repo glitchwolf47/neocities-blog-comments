@@ -1,27 +1,50 @@
-name: Save Comment
-on:
-  repository_dispatch:
-    types: [new-comment]
+// 1. GET THE UNIQUE ID (The filename of the current page)
+const currentPostID = window.location.pathname.split("/").pop() || "home";
 
-jobs:
-  update-json:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
+// 2. LOAD ONLY MATCHING COMMENTS
+async function loadComments() {
+    try {
+        const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/main/comments.json?t=${new Date().getTime()}`;
+        const response = await fetch(url);
+        const allComments = await response.json();
+        
+        // FILTER: Only keep comments where the postID matches this page
+        const filteredComments = allComments.filter(c => c.postID === currentPostID);
+        
+        const display = document.getElementById('display-comments');
+        if (filteredComments.length === 0) {
+            display.innerHTML = "// NO TRANSMISSIONS LOGGED FOR THIS POST.";
+        } else {
+            display.innerHTML = filteredComments.map(c => `
+                <div style="margin-bottom: 15px; border-bottom: 1px dashed #333;">
+                    <b style="color: #ff00ff;">> ${c.name}:</b>
+                    <p style="margin: 5px 0; color: #eee;">${c.message}</p>
+                </div>
+            `).reverse().join('');
+        }
+    } catch (e) {
+        document.getElementById('display-comments').innerHTML = "ERROR: SATELLITE OFFLINE.";
+    }
+}
 
-      - name: Add Comment to JSON
-        run: |
-          # Use 'jq' to add the new comment data to our array
-          echo '${{ github.event.client_payload.data }}' > new_comment.json
-          jq '. += [input]' comments.json new_comment.json > updated_comments.json
-          mv updated_comments.json comments.json
-          rm new_comment.json
+// 3. SEND COMMENT WITH THE POST ID
+async function postComment() {
+    const name = document.getElementById('comment-name').value;
+    const message = document.getElementById('comment-message').value;
 
-      - name: Commit and Push
-        run: |
-          git config user.name "CommentBot"
-          git config user.email "bot@neocities.org"
-          git add comments.json
-          git commit -m "New comment from site"
-          git push
+    if (!name || !message) return alert("FIELDS EMPTY, GHOST.");
+
+    const payload = {
+        event_type: 'new-comment',
+        client_payload: {
+            data: { 
+                postID: currentPostID, // <--- THIS TAGS THE COMMENT
+                name: name, 
+                message: message, 
+                date: new Date().toISOString() 
+            }
+        }
+    };
+
+    // ... (The rest of your Fetch/POST code stays the same)
+}
